@@ -1,0 +1,185 @@
+package com.example.itda.program.controller
+
+import com.example.itda.program.persistence.ProgramEntity
+import com.example.itda.program.persistence.ProgramExampleEntity
+import com.example.itda.program.persistence.enums.ProgramCategory
+import java.time.OffsetDateTime
+
+data class ProgramSummaryResponse(
+    val id: Long,
+    val title: String,
+    val preview: String,
+    val operatingEntity: String,
+    val operatingEntityType: String,
+    val category: String,
+    val categoryValue: String,
+    val likeStatus: String?,
+    val isBookmarked: Boolean,
+    val reason: String?,
+) {
+    companion object {
+        fun fromEntity(
+            entity: ProgramEntity,
+            isBookmarked: Boolean = false,
+            likeStatus: Boolean? = null,
+            reason: String? = null,
+        ): ProgramSummaryResponse {
+            val likeStatusString =
+                when (likeStatus) {
+                    true -> "LIKED"
+                    false -> "DISLIKED"
+                    null -> null
+                }
+
+            return ProgramSummaryResponse(
+                id = entity.id,
+                title = entity.title,
+                preview = entity.preview,
+                operatingEntity = entity.operatingEntity,
+                operatingEntityType = entity.operatingEntityType.toString().lowercase(),
+                category = entity.category.toString().lowercase(),
+                categoryValue = entity.category.value,
+                likeStatus = likeStatusString,
+                isBookmarked = isBookmarked,
+                reason = reason,
+            )
+        }
+
+        fun fromEntity(entity: ProgramExampleEntity): ProgramSummaryResponse =
+            ProgramSummaryResponse(
+                id = entity.id!!,
+                title = entity.title,
+                preview = entity.preview,
+                operatingEntity = entity.operatingEntity,
+                operatingEntityType = entity.operatingEntityType.toString().lowercase(),
+                category = entity.category.toString().lowercase(),
+                categoryValue = entity.category.value,
+                likeStatus = null,
+                isBookmarked = false,
+                reason = null,
+            )
+    }
+}
+
+data class ProgramResponse(
+    val id: Long,
+    val uuid: String,
+    val category: String,
+    val categoryValue: String,
+    val title: String,
+    val details: String,
+    val summary: String,
+    val preview: String,
+    val applicationMethod: String?,
+    val applyUrl: String?,
+    val referenceUrl: String?,
+    val eligibilityMinAge: Int?,
+    val eligibilityMaxAge: Int?,
+    val eligibilityMinHousehold: Int?,
+    val eligibilityMaxHousehold: Int?,
+    val eligibilityMinIncome: Int?,
+    val eligibilityMaxIncome: Int?,
+    val eligibilityRegion: String?,
+    val eligibilityGender: String?,
+    val eligibilityMaritalStatus: String?,
+    val eligibilityEducation: String?,
+    val eligibilityEmployment: String?,
+    val applyStartAt: OffsetDateTime?,
+    val applyEndAt: OffsetDateTime?,
+    val createdAt: OffsetDateTime?,
+    val operatingEntity: String,
+    val operatingEntityType: String,
+    val likeStatus: String? = null,
+    val isBookmarked: Boolean = false,
+) {
+    companion object {
+        fun fromEntity(
+            entity: ProgramEntity,
+            likeStatus: Boolean?,
+            isBookmarked: Boolean,
+        ): ProgramResponse {
+            val likeStatusString =
+                when (likeStatus) {
+                    true -> "LIKED"
+                    false -> "DISLIKED"
+                    null -> null
+                }
+
+            return ProgramResponse(
+                id = entity.id,
+                uuid = entity.uuid,
+                category = entity.category.toString().lowercase(),
+                categoryValue = entity.category.value,
+                title = entity.title,
+                details = entity.details,
+                summary = entity.summary,
+                preview = entity.preview,
+                applicationMethod = entity.applicationMethod,
+                applyUrl = entity.applyUrl,
+                referenceUrl = entity.referenceUrl,
+                eligibilityMinAge = entity.eligibilityMinAge,
+                eligibilityMaxAge = entity.eligibilityMaxAge,
+                eligibilityRegion = entity.eligibilityRegion,
+                eligibilityMinHousehold = entity.eligibilityMinHousehold,
+                eligibilityMaxHousehold = entity.eligibilityMaxHousehold,
+                eligibilityMinIncome = entity.eligibilityMinIncome,
+                eligibilityMaxIncome = entity.eligibilityMaxIncome,
+                eligibilityGender = entity.eligibilityGender?.value,
+                eligibilityMaritalStatus = entity.eligibilityMaritalStatus?.value,
+                eligibilityEducation = entity.eligibilityEducation?.value,
+                eligibilityEmployment = entity.eligibilityEmployment?.value,
+                applyStartAt = entity.applyStartAt,
+                applyEndAt = entity.applyEndAt,
+                createdAt = entity.createdAt,
+                operatingEntity = entity.operatingEntity,
+                operatingEntityType = entity.operatingEntityType.toString().lowercase(),
+                likeStatus = likeStatusString,
+                isBookmarked = isBookmarked,
+            )
+        }
+
+        fun fromEntity(entity: ProgramExampleEntity): ProgramResponse =
+            ProgramResponse(
+                id = entity.id!!,
+                uuid = entity.uuid,
+                category = entity.category.toString().lowercase(),
+                categoryValue = entity.category.value,
+                title = entity.title,
+                details = entity.details,
+                summary = entity.summary,
+                preview = entity.preview,
+                applicationMethod = entity.applicationMethod,
+                applyUrl = entity.applyUrl,
+                referenceUrl = entity.referenceUrl,
+                eligibilityMinAge = entity.eligibilityMinAge,
+                eligibilityMaxAge = entity.eligibilityMaxAge,
+                eligibilityRegion = entity.eligibilityRegion,
+                eligibilityMinHousehold = entity.eligibilityMinHousehold,
+                eligibilityMaxHousehold = entity.eligibilityMaxHousehold,
+                eligibilityMinIncome = entity.eligibilityMinIncome,
+                eligibilityMaxIncome = entity.eligibilityMaxIncome,
+                eligibilityGender = entity.eligibilityGender?.value,
+                eligibilityMaritalStatus = entity.eligibilityMaritalStatus?.value,
+                eligibilityEducation = entity.eligibilityEducation?.value,
+                eligibilityEmployment = entity.eligibilityEmployment?.value,
+                applyStartAt = entity.applyStartAt,
+                applyEndAt = entity.applyEndAt,
+                createdAt = entity.createdAt,
+                operatingEntity = entity.operatingEntity,
+                operatingEntityType = entity.operatingEntityType.toString().lowercase(),
+            )
+    }
+}
+
+data class ProgramCategoryResponse(
+    val category: String,
+    val value: String,
+) {
+    companion object {
+        fun fromEntity(category: ProgramCategory): ProgramCategoryResponse =
+            ProgramCategoryResponse(
+                category = category.toString().lowercase(),
+                value = category.value,
+            )
+    }
+}

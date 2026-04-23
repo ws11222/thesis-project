@@ -1,0 +1,89 @@
+package com.example.itda.program.persistence
+
+import com.example.itda.program.persistence.enums.ProgramCategory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+
+interface ProgramRepository : JpaRepository<ProgramEntity, Long> {
+    @Query(
+        value = """
+        SELECT p.*
+        FROM program p
+        JOIN "user" u ON u.id = :userId
+        AND (p.eligibility_gender IS NULL OR p.eligibility_gender = u.gender)
+        AND (p.eligibility_marital_status is NULL OR p.eligibility_marital_status = u.marital_status)
+        AND (p.eligibility_education is NULL OR p.eligibility_education = u.education_level)
+        AND (p.eligibility_min_household is NULL OR p.eligibility_min_household <= u.household_size)
+        AND (p.eligibility_max_household is NULL OR p.eligibility_max_household >= u.household_size)
+        AND (p.eligibility_min_income is NULL OR p.eligibility_min_income <= u.household_income)
+        AND (p.eligibility_max_income is NULL OR p.eligibility_max_income >= u.household_income)
+        AND (p.eligibility_employment is NULL OR p.eligibility_employment = u.employment_status)
+        AND (p.eligibility_min_age IS NULL OR u.birth_date IS NULL OR p.eligibility_min_age <= DATE_PART('year', AGE(CURRENT_DATE, u.birth_date)))
+        AND (p.eligibility_max_age IS NULL OR u.birth_date IS NULL OR p.eligibility_max_age >= DATE_PART('year', AGE(CURRENT_DATE, u.birth_date)))
+        
+        LEFT JOIN postcode_mapping pm ON pm.postcode_prefix = SUBSTRING(u.postcode, 1, 3)
+        WHERE (
+            p.operating_entity_type = 'CENTRAL'
+            OR (
+                p.operating_entity_type = 'LOCAL' 
+                AND (
+                    p.eligibility_region = pm.region 
+                    OR 
+                    p.eligibility_region = pm.region_major
+                )
+            )
+        )
+        """,
+        nativeQuery = true,
+    )
+    fun findAllByUserInfo(userId: String): List<ProgramEntity>
+
+    @Query(
+        """
+        SELECT p FROM ProgramEntity p
+        WHERE (
+                (LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%'))) 
+               OR (LOWER(p.preview) LIKE LOWER(CONCAT('%', :query, '%')))
+               OR (LOWER(p.summary) LIKE LOWER(CONCAT('%', :query, '%')))
+               OR (LOWER(p.operatingEntity) LIKE LOWER(CONCAT('%', :query, '%')))
+           )
+            And (:category IS NULL OR p.category = :category)
+        ORDER BY p.createdAt DESC,
+        p.id ASC
+    """,
+    )
+    fun searchLatest(
+        @Param("query") query: String,
+        @Param("category") category: ProgramCategory?,
+        pageable: Pageable,
+    ): Page<ProgramEntity>
+
+    @Query(
+        """
+        SELECT p
+        FROM ProgramEntity p
+        WHERE (
+                LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%')) 
+               OR LOWER(p.preview) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.summary) LIKE LOWER(CONCAT('%', :query, '%'))
+               OR LOWER(p.operatingEntity) LIKE LOWER(CONCAT('%', :query, '%'))
+            )
+            And (:category IS NULL OR p.category = :category)
+        ORDER BY 
+            (CASE WHEN LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%')) THEN 4 ELSE 0 END) +
+            (CASE WHEN LOWER(p.preview) LIKE LOWER(CONCAT('%', :query, '%')) THEN 3 ELSE 0 END) +
+            (CASE WHEN LOWER(p.summary) LIKE LOWER(CONCAT('%', :query, '%')) THEN 2 ELSE 0 END) +
+            (CASE WHEN LOWER(p.operatingEntity) LIKE LOWER(CONCAT('%', :query, '%')) THEN 1 ELSE 0 END) DESC,
+            p.createdAt DESC,
+            p.id ASC
+    """,
+    )
+    fun searchByRank(
+        @Param("query") query: String,
+        @Param("category") category: ProgramCategory?,
+        pageable: Pageable,
+    ): Page<ProgramEntity>
+}

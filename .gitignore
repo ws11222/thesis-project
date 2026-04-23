@@ -1,0 +1,11 @@
+.idea/
+
+**/.env
+**/.DS_Store
+**/__pycache__
+**/playground.py
+
+/data-pipeline/data/*
+
+**/docker-compose.override.yml
+
