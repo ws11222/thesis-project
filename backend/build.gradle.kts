@@ -44,7 +44,7 @@ dependencies {
     // Database
     runtimeOnly("org.postgresql:postgresql")
     implementation("com.pgvector:pgvector:0.1.4")
-    implementation("com.google.cloud.sql:postgres-socket-factory:1.25.3")
+
     implementation("org.hibernate.orm:hibernate-vector:6.6.29.Final")
 
     // Test
