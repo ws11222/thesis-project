@@ -44,7 +44,7 @@ export function updateProfile(token, name) {
     educationLevel: 'HIGH_SCHOOL',
     householdSize: 2,
     householdIncome: 3000,
-    employmentStatus: 'RETIRED',
+    employmentStatus: 'UNEMPLOYED',
     tags: ['건강', '복지'],
   });
   const res = http.put(`${BASE_URL}/api/v1/my-profile`, payload, {
@@ -53,6 +53,17 @@ export function updateProfile(token, name) {
   });
   check(res, {
     'updateProfile status 200': (r) => r.status === 200,
+  });
+  return res;
+}
+
+export function getProfile(token) {
+  const res = http.get(`${BASE_URL}/api/v1/my-profile`, {
+    headers: authHeaders(token),
+    tags: { name: 'get-profile' },
+  });
+  check(res, {
+    'getProfile status 200': (r) => r.status === 200,
   });
   return res;
 }

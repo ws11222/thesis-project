@@ -24,6 +24,7 @@ case "$SCENARIO" in
   s2) export DELAY_MODE=fixed; export DELAY_MS=200;   SCRIPT=s2-saturation.js ;;
   s3) export DELAY_MODE=fixed; export DELAY_MS=5000;  SCRIPT=s3-degradation.js ;;
   s4) export DELAY_MODE=fixed; export DELAY_MS=30000; SCRIPT=s4-outage.js ;;
+  s5) export DELAY_MODE=fixed; export DELAY_MS=5000;  SCRIPT=s5-blast-radius.js ;;
   *) echo "unknown scenario $SCENARIO" >&2; exit 1 ;;
 esac
 
@@ -51,6 +52,7 @@ DB_USERNAME=dev \
 DB_PASSWORD=devpw \
 EMBEDDING_SERVER_URL=http://localhost:8000 \
 EMBEDDING_SERVER_API_KEY=local-dev-key \
+JWT_SECRET_KEY=loadtest-jwt-secret-key-loadtest-jwt-secret-key \
 SPRING_PROFILES_ACTIVE=loadtest \
 java -jar "$JAR" > "$RESULTS_DIR/${TAG}.spring.log" 2>&1 &
 SPRING_PID=$!
