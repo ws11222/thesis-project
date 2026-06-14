@@ -23,7 +23,8 @@
 | S2 Saturation | 부하 증가 | 50 | 200ms | 풀 한계점 탐색 |
 | S3 Degradation | 외부 서비스 지연 | 10 | 5s | 외부 지연이 우리 API SLO를 침범하는가 |
 | S4 Outage | 외부 서비스 다운 | 10 | 30s (>timeout 10s) | 외부 장애가 우리 API에 격리되는가 |
-| **S5 Blast Radius** | 외부 지연 중 무관한 GET | 10 writer + 5 reader | 5s | **핵심 비교** — 외부 지연이 무관한 API까지 전파되는가 (DB 커넥션 풀 고갈) |
+| **S5 Blast Radius** | 외부 지연 중 무관한 GET | 10 writer + 5 reader | 5s | 외부 지연이 무관한 API까지 전파되는가 (DB 커넥션 풀 고갈) |
+| **S6 Cache Miss** | 피드 캐시 재생성 부하 | 10 (shared 300 iter) | 200ms (무관) | 추천 점수 계산을 JVM에서 Postgres로 푸시다운한 효과 |
 
 ### 수치 정당화
 
@@ -113,6 +114,54 @@ bash load-test/scripts/run-scenario.sh after  s3    # 개선 후, S3
 개선 후 S3/S4에서 사용자는 즉시 200 OK를 받지만, 임베딩 갱신은 백그라운드에서 timeout(10s) 후 실패하므로 **그 사용자의 임베딩은 일시적으로 stale 상태**가 됨. 다음 프로필 업데이트 시 자연 복구.
 
 S5의 writer 측 에러율(약 19%)은 측정 인공물 — 부하 테스트에서 `__VU % token_count` 매핑으로 일부 토큰을 여러 VU가 공유하며 동일 사용자에 대한 동시 업데이트가 발생, `TagEntity` 수준의 `ObjectOptimisticLockingFailureException`이 발생한 결과. 본 평가의 관심은 무관한 reader 측 영향이므로 별도 보정 없이 수집된 값을 그대로 보고함.
+
+### S6 Cache Miss — pgvector 푸시다운 효과
+
+피드 캐시 재생성 (`generateFeedCache`) 경로의 단위 비용을 측정. 사용자 300명이 각자 한 번씩 첫 피드를 요청 (shared-iterations executor) → 300회 cache miss → 매 호출마다 후보 정책에 대해 추천 점수 계산.
+
+**개선 전 (`refactor/async-embedding-refresh` HEAD)**: JVM이 program 엔티티 전체를 hydrate한 뒤 프로그램당 4회 dot product 계산.
+**개선 후 (`refactor/pgvector-pushdown-feed-cache`)**: 단일 native query에 `<#>` 연산자를 사용해 4개 inner product를 컬럼으로 추가, score/denom/like_dot/bookmark_dot 모두 Postgres에서 계산.
+
+두 가지 부하 조건에서 측정.
+
+#### (a) 기본 시나리오 — fresh signup user (eligibility 필터 통과 후 후보 ~93개)
+
+| 지표 | Before | After | 개선 |
+|---|---|---|---|
+| `GET /programs` p50 | 60ms | 28ms | 2.1× |
+| `GET /programs` p95 | 170ms | 99ms | 1.7× |
+| `GET /programs` p99 | 460ms | 225ms | 2.0× |
+| 처리량 (req/s) | 14.8 | 16.4 | +11% |
+
+이 결과는 보수적. 후보 수가 작아 (93/2163) JVM 측 hydration · 벡터 연산 비용이 모두 작은 절대값.
+
+#### (b) Full catalog 시나리오 — eligibility 필터 임시 제거 (후보 = 전체 2163개)
+
+| 지표 | Before | After | **개선** |
+|---|---|---|---|
+| `GET /programs` p50 | 1.37s | 72ms | **19×** |
+| **`GET /programs` p95** | **2.04s** | **187ms** | **10.9×** |
+| `GET /programs` p99 | 2.28s | 481ms | 4.7× |
+| 평균 응답 시간 | 1.42s | 91ms | **15.6×** |
+| **처리량 (req/s)** | **4.9** | **15.1** | **3.1×** |
+
+이게 pgvector 푸시다운의 본 효과. 후보 수가 (a)의 23배(93 → 2163)로 늘 때:
+- **Before는 거의 선형 비례로 느려짐** (60ms → 1370ms, 약 23× — JPA hydration이 row 수에 선형 의존)
+- **After는 거의 변함없음** (28ms → 72ms, 약 2.5× — pgvector SIMD + 결과만 전송)
+
+→ 운영 규모(정책 수만 개 + 풍부한 프로필) 환경에서 차이는 훨씬 더 클 것.
+
+**해석**:
+1. **데이터 이동 제거**: 개선 전은 program 한 행당 vector(1024) + 텍스트 컬럼을 JVM으로 hydrate. 개선 후는 id/카테고리/제목/4 float 만 받음 → 행당 페이로드 95%↓.
+2. **JPA hydration 제거**: 후보 program 객체를 만들지 않음 — 23× row 수 증가 시 이게 압도적 비용.
+3. **CPU 이동**: 벡터 내적이 JVM 바이트코드 → Postgres C 구현(SIMD).
+
+**측정 방법 (재현용)**:
+- (a) 는 코드 변경 없이 `bash load-test/scripts/run-scenario.sh {before|after} s6` 그대로.
+- (b) 는 `ProgramRepository` 의 eligibility 필터를 임시로 `WHERE :userId IS NOT NULL` 로 치환 후 jar 빌드. 측정 후 즉시 revert (커밋에 반영하지 않음).
+
+**한계**:
+- 단일 호스트 측정 (DB loopback) — 운영 원격 DB 였다면 네트워크 비용 감소 효과가 추가로 드러남.
 
 ## 참고
 
